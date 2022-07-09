@@ -180,10 +180,10 @@ namespace LineCounter
             Console.WriteLine($"Total characters: {TotalChars}");
             Console.WriteLine($"-------------LANGUAGE SUMMARY-------------");
             Console.WriteLine($"Most prevalent language: {orderedLangs[0].Key} - {orderedLangs[0].Value.Item1} lines in {orderedLangs[0].Value.Item3} files");
-            Console.WriteLine($"-LANG-----------LINES------CHARS-------FILES-");
+            Console.WriteLine($"-LANGUAGE-----------------FILES----LINES----CHARS-");
             foreach (var lang in orderedLangs)
             {
-                Console.WriteLine(@$"{lang.Key,-10}{lang.Value.Item1,10}{lang.Value.Item2,10}{lang.Value.Item3,10}");
+                Console.WriteLine(@$"{lang.Key,-20}{lang.Value.Item3,10}{lang.Value.Item1,10}{lang.Value.Item2,10}");
             }
         }
     }

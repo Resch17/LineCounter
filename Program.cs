@@ -38,6 +38,7 @@ Parser.Default.ParseArguments<Options>(args).WithParsed<Options>(o =>
         {
             exclude.Add(new IgnoreRule(term));
         }
+        Console.WriteLine($"Excluding: {o.Exclude}");
     }
     var counter = new Counter(languages, exclude);
     if (o.File)
