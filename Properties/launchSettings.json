@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "LineCounter": {
+      "commandName": "Project",
+      "commandLineArgs": "C:/webdev/nss/FrontEnd -e node_modules,*.json,dist,build"
+    }
+  }
+}
