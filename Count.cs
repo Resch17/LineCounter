@@ -1,11 +1,5 @@
 ﻿using Ignore;
 using LineCounter.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace LineCounter
 {
@@ -23,18 +17,18 @@ namespace LineCounter
         public Summary GetDirStats(string path)
         {
             var dirStats = new Summary() { Path = path };
-            int totalLines = 0;
-            int totalChars = 0;
-            Queue<string> queue = new Queue<string>();
-            queue.Enqueue(path);
-            while (queue.Count > 0)
+            Queue<string> pathsQueue = new Queue<string>();
+            pathsQueue.Enqueue(path);
+            while (pathsQueue.Count > 0)
             {
-                path = queue.Dequeue();
+                path = pathsQueue.Dequeue();
                 try
                 {
                     foreach (string subDir in Directory.GetDirectories(path))
                     {
                         var dinfo = new DirectoryInfo(subDir);
+
+                        // only add path to queue if it's doesn't meet the 'exclude' criteria
                         bool goodToGo = true;
                         foreach (var term in _exclude)
                         {
@@ -45,7 +39,7 @@ namespace LineCounter
                         }
                         if (goodToGo)
                         {
-                            queue.Enqueue(subDir);
+                            pathsQueue.Enqueue(subDir);
                         }
                     }
                 }
@@ -53,6 +47,7 @@ namespace LineCounter
                 {
                     Console.Error.WriteLine(ex);
                 }
+
                 var thisDir = new Dir();
                 string[] files = null;
                 try
@@ -77,30 +72,44 @@ namespace LineCounter
                 dirStats.Dirs.Add(thisDir);
             }
 
-            var allFiles = new List<File>();
+            var codeFiles = new List<File>();
             dirStats.Dirs.ForEach(d =>
             {
-                d.Files.ForEach(f => { allFiles.Add(f); });
-            });
-            var filteredFiles = allFiles.Where(x => x.LanguageName != null).ToList();
-            dirStats.CodeFiles = filteredFiles.Count();
-            (int, int) totals = filteredFiles
-                 .Aggregate((0, 0), (total, current) =>
-            {
-                total.Item1 += current.LineCount;
-                total.Item2 += current.CharCount;
-                return total;
-            });
-            (dirStats.TotalLines, dirStats.TotalChars) = totals;
-
-            var grouped = filteredFiles.GroupBy(x => x.LanguageName);
-            foreach (var grouping in grouped)
-            {
-                dirStats.LanguageCounts.Add(grouping.Key, grouping.Aggregate((0, 0, 0), (total, current) =>
+                d.Files.ForEach(f =>
                 {
-                    total.Item1 += current.LineCount;
-                    total.Item2 += current.CharCount;
-                    total.Item3++;
+                    if (f.LanguageName != null)
+                    {
+                        codeFiles.Add(f);
+                    }
+                });
+            });
+
+            dirStats.CodeFiles = codeFiles.Count();
+
+            Totals totals = codeFiles
+                  .Aggregate<File, Totals>(new Totals(), (total, current) =>
+             {
+                 total.LineCount += current.LineCount;
+                 total.CharCount += current.CharCount;
+                 return total;
+             });
+
+            dirStats.TotalLines = totals.LineCount;
+            dirStats.TotalChars = totals.CharCount;
+
+            var grouped = codeFiles.GroupBy(x => x.LanguageName);
+            foreach (var languageGrouping in grouped)
+            {
+                if (languageGrouping.Key == null)
+                {
+                    continue;
+                }
+
+                dirStats.LanguageCounts.Add(languageGrouping.Key, languageGrouping.Aggregate<File, Totals>(new Totals(), (total, current) =>
+                {
+                    total.LineCount += current.LineCount;
+                    total.CharCount += current.CharCount;
+                    total.FileCount++;
                     return total;
                 }));
             }
@@ -169,23 +178,30 @@ namespace LineCounter
         public int TotalLines { get; set; }
         public int CodeFiles { get; set; }
         public int TotalChars { get; set; }
-        public Dictionary<string, (int, int, int)> LanguageCounts { get; set; } = new Dictionary<string, (int, int, int)>();
+        public Dictionary<string, Totals> LanguageCounts { get; set; } = new Dictionary<string, Totals>();
         public void PrintSummary()
         {
-            var orderedLangs = LanguageCounts.OrderByDescending(x => x.Value.Item1).ToList();
+            var orderedLangs = LanguageCounts.OrderByDescending(x => x.Value.LineCount).ToList();
             Console.WriteLine("----------------PATH STATS----------------");
             Console.WriteLine($"Path: {Path}");
             Console.WriteLine($"Number of code files found: {CodeFiles}");
             Console.WriteLine($"Total lines of code: {TotalLines}");
             Console.WriteLine($"Total characters: {TotalChars}");
             Console.WriteLine($"-------------LANGUAGE SUMMARY-------------");
-            Console.WriteLine($"Most prevalent language: {orderedLangs[0].Key} - {orderedLangs[0].Value.Item1} lines in {orderedLangs[0].Value.Item3} files");
+            Console.WriteLine($"Most prevalent language: {orderedLangs[0].Key} - {orderedLangs[0].Value.LineCount} lines in {orderedLangs[0].Value.FileCount} files");
             Console.WriteLine($"-LANGUAGE-----------------FILES----LINES----CHARS-");
             foreach (var lang in orderedLangs)
             {
-                Console.WriteLine(@$"{lang.Key,-20}{lang.Value.Item3,10}{lang.Value.Item1,10}{lang.Value.Item2,10}");
+                Console.WriteLine(@$"{lang.Key,-20}{lang.Value.FileCount,10}{lang.Value.LineCount,10}{lang.Value.CharCount,10}");
             }
         }
+    }
+
+    public class Totals
+    {
+        public int LineCount { get; set; } = 0;
+        public int CharCount { get; set; } = 0;
+        public int FileCount { get; set; } = 0;
     }
 
     public class File
